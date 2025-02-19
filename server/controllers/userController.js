@@ -1,9 +1,9 @@
-import sendEmail from '../config/sendEmail'
-import userModel from '../models/userModel'
+import sendEmail from '../config/sendEmail.js'
+import userModel from '../models/userModel.js'
 import bcryptjs from 'bcryptjs'
-import verifyEmailTemplate from '../utils/verifyEmailTemplate'
+import verifyEmailTemplate from '../utils/verifyEmailTemplate.js'
 
-export async function registerUserController(request, response) {
+export default async function registerUserController(request, response) {
   try { 
     const { name, email, password } = request.body
     if(!name || !email || !password) { 
@@ -18,7 +18,7 @@ export async function registerUserController(request, response) {
     const userEmailPresent = await userModel.findOne({email})
     if(userEmailPresent) { 
       return response.json({
-        message: 'Email Already Registered',
+        message: 'Email Already Registered!!',
         Error: true,
         success: false
       })
@@ -51,7 +51,7 @@ export async function registerUserController(request, response) {
     })
 
     return response.json({
-      message: 'User Registered Successfully !!',
+      message: 'User Registered Successfully',
       error: false,
       success: true,
       data: saveUser
@@ -65,3 +65,35 @@ export async function registerUserController(request, response) {
     })
   }
 } 
+
+export async function verifyUserController(request, response) { 
+  try { 
+    const userCode = request.body 
+    const verifiedUser = await userModel.findOne({_id: userCode})
+
+    if(!verifiedUser) { 
+      return response.status(400).json({
+        message: 'Invalid Code',
+        error: true,
+        success: false
+      })
+    }
+
+    const updateUserFields = await userModel.updateOne({_id: userCode}, {
+      verify_email: true
+    })
+
+    return response.json({
+      message: 'Email Verified Successfully',
+      error: false,
+      success: true
+    })
+  }
+  catch(error) { 
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+}
