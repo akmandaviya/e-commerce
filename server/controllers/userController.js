@@ -4,6 +4,9 @@ import bcryptjs from 'bcryptjs'
 import verifyEmailTemplate from '../utils/verifyEmailTemplate.js'
 import generateRefreshToken from '../utils/generateRefreshToken.js'
 import generateAccessToken from '../utils/generateAccessToken.js'
+import uploadAvatar from '../utils/uploadAvatarCloudinary.js'
+import generateOTP from '../utils/generateOTP.js'
+import forgotPasswordTemplate from '../utils/forgotPasswordTemplate.js'
 
 // user register api controller
 export default async function registerUserController(request, response) {
@@ -93,7 +96,7 @@ export async function verifyUserController(request, response) {
       success: true
     })
   }
-  catch(error) { 
+  catch(error) {     
     return response.status(500).json({
       message: error.message || error,
       error: true,
@@ -199,6 +202,116 @@ export async function logoutController(request, response) {
   }
   catch(error) {
     return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+}
+
+// upload user avatar controller
+export async function uploadAvatarController(request, response) { 
+  try { 
+    const Id = request.userId // from auth middleware
+    const image = request.file // from multer middleware
+    const upload = await uploadAvatar(image)
+
+    // adding avatar url in db
+    const updateAvatarDB = await userModel.findByIdAndUpdate(Id, { avatar: upload.url})
+
+    return response.json({
+      message: 'Profile Picture Uploaded Successfully',
+      data: {
+        _id: Id,
+        avatar: upload.url
+      }
+    })
+  }
+  catch(error) { 
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+}
+
+// update user data controller
+export async function updateUserDataController(request,response) { 
+  try{
+    const userId = request.userId // auth middleware
+    const { name, email, mobile, password } = request.body
+    
+    let hashPassword = ''
+
+    if(password) { 
+      const passSalt = await bcryptjs.genSalt(10)
+      hashPassword = await bcryptjs.hash(password, passSalt)
+    }
+
+    const updateUser = await userModel.updateOne( {_id: userId}, {
+      ...(name && {name:name}),
+      ...(email && {email:email}),
+      ...(mobile && {mobile: mobile}),
+      ...(password && {password: hashPassword})
+    })
+
+    return response.json({
+      message: 'Profile Details Updated Successfuly',
+      error: false,
+      success: true,
+      data: updateUser
+    })
+  }
+  catch(error) { 
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+} 
+
+//forgot password controller
+export async function forgotPasswordController(request,response) {
+  try { 
+    const {email} = request.body    
+    const user = await userModel.findOne({email})
+
+    if(!user) { 
+      return response.status(400).json({
+        message: 'Entered Email not available for any user',
+        error: true,
+        success: false
+      })
+    }
+
+    const otp = generateOTP()
+
+    const otPExpireTime = new Date() + 60 * 60 * 1000 // otp expires in 1hr
+
+    const updateOTP = await userModel.findByIdAndUpdate( user._id, { 
+      forgot_password_otp: otp,
+      forgot_password_expire: otPExpireTime
+    })
+
+    await sendEmail({
+      sendTo: email,
+      subject: 'Forget password OTP from One Cart',
+      html: forgotPasswordTemplate({
+        name: user.name,
+        otp: otp
+      })
+    })
+
+    return response.json({
+      message: 'Check Your Email for OTP',
+      error: false,
+      success: true
+    })
+  }
+  catch(error){
+    return response.status(500).json({ 
       message: error.message || error,
       error: true,
       success: false
