@@ -5,7 +5,10 @@ import registerUserController, { loginController,
                                  verifyUserController, 
                                  uploadAvatarController, 
                                  updateUserDataController,
-                                 forgotPasswordController} from '../controllers/userController.js'
+                                 forgotPasswordController,
+                                 verifyPasswordOTPController,
+                                 resetPasswordController,
+                                 refreshTokenController} from '../controllers/userController.js'
 import upload from '../middleware/multer.js'
 
 const userRouter = Router()
@@ -17,4 +20,8 @@ userRouter.get('/logout', auth, logoutController) // only logged in user can acc
 userRouter.put('/upload-avatar', auth, upload.single('avatar'), uploadAvatarController)
 userRouter.put('/update-profile-details', auth, updateUserDataController)
 userRouter.post('/forgot-password', forgotPasswordController)
+userRouter.put('/verify-forgot-password-otp', verifyPasswordOTPController)
+userRouter.put('/reset-password', resetPasswordController)
+userRouter.post('/refresh-token', refreshTokenController)
+
 export default userRouter

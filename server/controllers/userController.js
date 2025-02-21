@@ -7,6 +7,7 @@ import generateAccessToken from '../utils/generateAccessToken.js'
 import uploadAvatar from '../utils/uploadAvatarCloudinary.js'
 import generateOTP from '../utils/generateOTP.js'
 import forgotPasswordTemplate from '../utils/forgotPasswordTemplate.js'
+import jwt from 'jsonwebtoken'
 
 // user register api controller
 export default async function registerUserController(request, response) {
@@ -313,6 +314,171 @@ export async function forgotPasswordController(request,response) {
   catch(error){
     return response.status(500).json({ 
       message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+}
+
+// verify forgot password otp
+export async function verifyPasswordOTPController(request, response) { 
+  try{
+    const {email,otp} = request.body
+
+    if(!email || !otp) { 
+      return response.status(400).json({
+        message: 'Email and OTP required!!!',
+        error: true,
+        success: false
+      })
+    }
+
+    const user = await userModel.findOne({email})
+
+    if(!user) {
+      return response.status(400).json({
+        message: 'Entered Email not available for any user',
+        error: true,
+        success: false
+      })
+    }
+
+    // if otp expired
+    const currentTime = new Date()
+    if(user.forgot_password_expire < currentTime.toISOString()) { 
+      return response.status(400).json({
+        message: 'OTP Expired!!',
+        error: true,
+        success: false
+      })
+    }
+
+    // if otp is not matched with user entered OTP
+    if(otp !== user.forgot_password_otp){
+      return response.status(400).json({
+        message: 'Invalid OTP',
+        error: true,
+        success: false
+      })
+    }
+
+    // if otp not expired and otp is matched
+    return response.json({ 
+      message: 'OTP Verified Successfully',
+      error: false,
+      success: true
+    })
+  }
+  catch(error) { 
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+}
+
+// reset password controller
+export async function resetPasswordController(request, response) { 
+  try{
+    const { email, newPassword, confirmPassword } = request.body
+
+    if(!email || !newPassword || !confirmPassword) { 
+      return response.status(400).json({ 
+        message: 'Please provide all the required fields!!',
+        error: true,
+        success: false
+      })
+    }
+
+    const user = await userModel.findOne({email})
+
+    if(!user) { 
+      return response.status(400).json({
+        message: 'Entered Email not available for any user',
+        error: true,
+        success: false
+      })
+    }
+
+    if(newPassword !== confirmPassword) { 
+      return response.status(400).json({
+        message: 'New Password and Confirm Password not matching',
+        error: true,
+        success: false
+      })
+    }
+    
+    
+    const passSalt = await bcryptjs.genSalt(10)
+    const hashPassword = await bcryptjs.hash(newPassword, passSalt)
+
+    const update = await userModel.findOneAndUpdate(user._id, {
+      password: hashPassword
+    })
+
+    return response.json({
+      message: 'Password updated Successfully',
+      error: false,
+      success: true
+    })
+
+  }
+  catch(error) { 
+    return response.status(500).json({
+      message: error.message || error,
+      error: true,
+      success: false
+    })
+  }
+}
+
+// managing refresh token
+export async function refreshTokenController(request,response) {
+  try {
+    const refreshToken = request.cookies.refreshToken || request?.header?.authorization?.spllit('')[1]
+
+    if(!refreshToken) { 
+      return response.status(401).json({
+        message: 'Unauthorised Access',
+        error: true,
+        success: false
+      })
+    }
+
+    const checkToken = await jwt.verify(refreshToken, process.env.REFRESH_TOKEN_KEY)
+
+    if(!checkToken) { 
+      return response.status(401).json({
+        message: 'Token Expired',
+        error: true,
+        success: false
+      })
+    }
+    const userId = checkToken?._id
+    const newAccessToken = await generateAccessToken(userId)
+
+    const cookiesOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None'
+     }
+
+
+    response.cookie('accessToken', newAccessToken, cookiesOptions)
+
+    return response.json({ 
+      message: 'New Token Generated',
+      error: false,
+      success: true,
+      data: { 
+        accessToken: newAccessToken
+      }
+    })
+  }
+  catch(error) { 
+    return response.status(500).json({
+      message: error.message || error, 
       error: true,
       success: false
     })
