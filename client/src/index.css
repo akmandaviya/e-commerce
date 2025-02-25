@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+footer .social-icons .fb :hover {
+  color: #0c14ec;
+}
+
+footer .social-icons .ig :hover {
+  color: #e21898;
+}
+
+footer .social-icons .x :hover {
+  color: #504e4f;
+}
